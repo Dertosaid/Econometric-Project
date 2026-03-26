@@ -1,0 +1,31 @@
+---
+title: "Factors determining average life expectancy."
+author: "Marcel Florjański, Filip Kasprzycki, Bartłomiej Klajn"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+In this project, we will analyze various factors in terms of their impact on life expectancy.
+Our dependent variable is:
+-life expectancy, 
+and our explanatory variables are:
+-access to clean fuels and technologies for cooking,
+-children per woman,
+-gdp per capita,
+-share of adults defined as obese,
+-share of adults who smoke,
+-share of individuals using the internet,
+-share of the population with access to electocity.
+
+In this project we will consider 3 main hypotheses:
+
+H1: Economic development (measured by GDP per capita) has a positive and diminishing marginal impact on life expectancy.
+
+H2: Lifestyle risks, specifically smoking and obesity rates, are expected to have a significant negative impact on longevity.
+
+H3: Infrastructure indicators, such as access to electricity and clean fuels, are vital determinants, especially in developing nations.
+
+All the data we use comes from Our World in Data, which is a reputable source for global statistics and research. The data is collected from various sources, including international organizations, research institutions, and government agencies. It is regularly updated and covers a wide range of topics, making it a valuable resource for our analysis of life expectancy and its determinants.
