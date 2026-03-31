@@ -72,9 +72,10 @@ df_final$Continent <- countrycode(sourcevar = df_final$Code,
                                   origin = "iso3c",
                                   destination = "continent")
 
-# 4. Converting Continent to a factor variable
+# 4. Converting char data to a factor variable
 df_final$Continent <- as.factor(df_final$Continent)
-
+df_final$Entity <- as.factor(df_final$Entity)
+df_final$Code <- as.factor(df_final$Code)
 table(df_final$Continent)
 
 # 5. Checking the final dataset
@@ -196,4 +197,48 @@ test_data  <- df_final[-train_indices, ]
 
 cat("Training set size:", nrow(train_data), "\n")
 cat("Testing set size: ", nrow(test_data))
+```
+
+Now let's choose the optimal set of variables, for this task we will use a Hellwig method, which evaluates the explanatory power of each variable in relation to the dependent variable and the redundancy among the explanatory variables. The method calculates a "quality index" for each variable, which helps us identify which variables contribute most to explaining the variance in life expectancy while minimizing redundancy.
+
+```{r}
+
+# Calculate the correlation matrix for the numeric variables in the training dataset, the factorial varaibles will be includes in the model as countries definitely have impact on the life expectancy.
+
+numeric_data <- train_data %>% select(where(is.numeric), -GDP) # usuwamy surowe GDP, zostawiamy log_GDP
+
+cor_matrix <- cor(numeric_data)
+
+r0 <- cor_matrix["LifeExp", -which(colnames(cor_matrix) == "LifeExp")]
+r <-cor_matrix[-which(rownames(cor_matrix) == "LifeExp"), -which(colnames(cor_matrix) == "LifeExp")]
+
+scenarios <- expand.grid(rep(list(c(TRUE, FALSE)), ncol(r) )) 
+H_final<-c()
+
+for(i in 1:nrow(scenarios) ) {
+  indices<-which(as.logical(scenarios[i,]))
+  if(length(indices)==0) {
+    H_final[i]<-0
+    next
+  }
+  H<-c()
+  for(j in 1:length(indices)) {
+     H[j]<- r0[indices[j]]^2 / sum(abs(r[indices[j],indices]))
+  }
+  H_final[i]<-sum(H)
+}
+
+
+best_idx <- which.max(H_final)
+
+best_vars <- colnames(r)[as.logical(scenarios[best_idx, ])]
+
+print(best_vars)
+
+```
+# Now let's see the best dataset for our model.
+
+```{r}
+print(r0)
+print(r)
 ```
