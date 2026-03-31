@@ -40,6 +40,7 @@ library(mice)
 library(countrycode)
 library(corrplot)
 library(ggplot2)
+library(car)
 ```
 
 ## 2. Data Loading and Merging
@@ -72,9 +73,10 @@ df_final$Continent <- countrycode(sourcevar = df_final$Code,
                                   origin = "iso3c",
                                   destination = "continent")
 
-# 4. Converting Continent to a factor variable
+# 4. Converting char data to a factor variable
 df_final$Continent <- as.factor(df_final$Continent)
-
+df_final$Entity <- as.factor(df_final$Entity)
+df_final$Code <- as.factor(df_final$Code)
 table(df_final$Continent)
 
 # 5. Checking the final dataset
@@ -197,3 +199,83 @@ test_data  <- df_final[-train_indices, ]
 cat("Training set size:", nrow(train_data), "\n")
 cat("Testing set size: ", nrow(test_data))
 ```
+
+Now let's choose the optimal set of variables, for this task we will use a Hellwig method, which evaluates the explanatory power of each variable in relation to the dependent variable and the redundancy among the explanatory variables. The method calculates a "quality index" for each variable, which helps us identify which variables contribute most to explaining the variance in life expectancy while minimizing redundancy.
+
+```{r}
+
+# Calculate the correlation matrix for the numeric variables in the training dataset, the factorial varaibles will be includes in the model as countries definitely have impact on the life expectancy.
+
+numeric_data <- train_data %>% select(where(is.numeric), -GDP) # usuwamy surowe GDP, zostawiamy log_GDP
+
+cor_matrix <- cor(numeric_data)
+
+r0 <- cor_matrix["LifeExp", -which(colnames(cor_matrix) == "LifeExp")]
+r <-cor_matrix[-which(rownames(cor_matrix) == "LifeExp"), -which(colnames(cor_matrix) == "LifeExp")]
+
+scenarios <- expand.grid(rep(list(c(TRUE, FALSE)), ncol(r) )) 
+H_final<-c()
+
+for(i in 1:nrow(scenarios) ) {
+  indices<-which(as.logical(scenarios[i,]))
+  if(length(indices)==0) {
+    H_final[i]<-0
+    next
+  }
+  H<-c()
+  for(j in 1:length(indices)) {
+     H[j]<- r0[indices[j]]^2 / sum(abs(r[indices[j],indices]))
+  }
+  H_final[i]<-sum(H)
+}
+
+
+best_idx <- which.max(H_final)
+
+best_vars <- colnames(r)[as.logical(scenarios[best_idx, ])]
+
+print(best_vars)
+
+```
+# Now let's see the best dataset for our model.
+
+```{r}
+print(r0)
+print(r)
+```
+
+
+## 4. Model Estimation and Comparison
+
+We decided to compare two approaches: a parsimonious model suggested by the Hellwig method and a full research model that includes all hypothesized predictors.
+
+```{r model_comparison}
+# Model 1: Based on Hellwig's selection
+model_hellwig <- lm(LifeExp ~ log_GDP + Fertility, data = train_data)
+
+# Model 2: Full research model (including lifestyle and continents)
+# We exclude raw GDP to avoid perfect collinearity with log_GDP
+model_full <- lm(LifeExp ~ log_GDP + Fertility + Obesity + Smoking + 
+                 Internet + Electricity + CleanFuels + Continent, 
+                 data = train_data)
+
+# Reviewing results
+summary(model_hellwig)
+summary(model_full)
+```
+
+
+The initial estimation of the full model yields a high Adjusted R-squared (0.8152), indicating that our variables collectively explain about 81.5% of the variance in global life expectancy. As expected, log_GDP and Fertility are highly significant ($p < 0.001$), and the Continent dummy variables confirm significant regional differences (e.g., a strong positive effect for Europe and Oceania compared to the African baseline). However, the infrastructure variables (Internet, Electricity, CleanFuels) and lifestyle factors (Smoking, Obesity) lack statistical significance. In econometric modeling, such a scenario—where the overall model fit is high but individual predictors are insignificant—strongly suggests the presence of multicollinearity. To diagnose this, we must examine the Variance Inflation Factor (VIF).
+
+
+```{r}
+vif(model_full)
+```
+
+
+The VIF diagnostic test clearly explains the lack of significance in our previous model. The VIF values for log_GDP (8.73), CleanFuels (7.40), and Internet (7.23) severely exceed the standard acceptable threshold of 5, indicating extreme multicollinearity. Access to electricity, internet, and clean fuels is so strongly coupled with a country's wealth that including them alongside GDP artificially inflates the standard errors of our estimators.
+
+From a scientific standpoint, this compels us to reject Hypothesis 3 (H3): at the macroeconomic level, basic infrastructure does not act as an independent driver of longevity, but is rather a direct function of economic development (log_GDP). Consequently, to establish a robust and mathematically sound model, we will remove the redundant infrastructure variables (Internet, Electricity, CleanFuels) and estimate a reduced model. This will allow us to properly test our remaining hypotheses (H1 and H2) without the distortion of variance inflation.
+
+
+

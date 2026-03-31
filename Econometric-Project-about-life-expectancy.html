@@ -385,7 +385,8 @@ analysis of life expectancy and its determinants.</p>
 library(mice)
 library(countrycode)
 library(corrplot)
-library(ggplot2)</code></pre>
+library(ggplot2)
+library(car)</code></pre>
 <div id="data-loading-and-merging" class="section level2">
 <h2>2. Data Loading and Merging</h2>
 <p>In this section, we load the raw datasets and merge them based on
@@ -416,9 +417,10 @@ df_final$Continent &lt;- countrycode(sourcevar = df_final$Code,
                                   origin = &quot;iso3c&quot;,
                                   destination = &quot;continent&quot;)
 
-# 4. Converting Continent to a factor variable
+# 4. Converting char data to a factor variable
 df_final$Continent &lt;- as.factor(df_final$Continent)
-
+df_final$Entity &lt;- as.factor(df_final$Entity)
+df_final$Code &lt;- as.factor(df_final$Code)
 table(df_final$Continent)</code></pre>
 <pre><code>## 
 ##   Africa Americas     Asia   Europe  Oceania 
@@ -429,7 +431,7 @@ nrow(df_final)</code></pre>
 <pre class="r"><code>head(df_final)</code></pre>
 <pre><code>## # A tibble: 6 × 11
 ##   Entity     Code  LifeExp    GDP Fertility Obesity Smoking Internet Electricity
-##   &lt;chr&gt;      &lt;chr&gt;   &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;    &lt;dbl&gt;       &lt;dbl&gt;
+##   &lt;fct&gt;      &lt;fct&gt;   &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;    &lt;dbl&gt;       &lt;dbl&gt;
 ## 1 Afghanist… AFG      65.6  1982.      4.93    17.6    22.7     17.2        85.3
 ## 2 Albania    ALB      78.8 19389.      1.36    26.6    21.9     82.6       100  
 ## 3 Algeria    DZA      76.1 14782.      2.82    24.2    21.2     74.8       100  
@@ -587,6 +589,173 @@ cat(&quot;Training set size:&quot;, nrow(train_data), &quot;\n&quot;)</code></pr
 <pre><code>## Training set size: 126</code></pre>
 <pre class="r"><code>cat(&quot;Testing set size: &quot;, nrow(test_data))</code></pre>
 <pre><code>## Testing set size:  32</code></pre>
+<p>Now let’s choose the optimal set of variables, for this task we will
+use a Hellwig method, which evaluates the explanatory power of each
+variable in relation to the dependent variable and the redundancy among
+the explanatory variables. The method calculates a “quality index” for
+each variable, which helps us identify which variables contribute most
+to explaining the variance in life expectancy while minimizing
+redundancy.</p>
+<pre class="r"><code># Calculate the correlation matrix for the numeric variables in the training dataset, the factorial varaibles will be includes in the model as countries definitely have impact on the life expectancy.
+
+numeric_data &lt;- train_data %&gt;% select(where(is.numeric), -GDP) # usuwamy surowe GDP, zostawiamy log_GDP
+
+cor_matrix &lt;- cor(numeric_data)
+
+r0 &lt;- cor_matrix[&quot;LifeExp&quot;, -which(colnames(cor_matrix) == &quot;LifeExp&quot;)]
+r &lt;-cor_matrix[-which(rownames(cor_matrix) == &quot;LifeExp&quot;), -which(colnames(cor_matrix) == &quot;LifeExp&quot;)]
+
+scenarios &lt;- expand.grid(rep(list(c(TRUE, FALSE)), ncol(r) )) 
+H_final&lt;-c()
+
+for(i in 1:nrow(scenarios) ) {
+  indices&lt;-which(as.logical(scenarios[i,]))
+  if(length(indices)==0) {
+    H_final[i]&lt;-0
+    next
+  }
+  H&lt;-c()
+  for(j in 1:length(indices)) {
+     H[j]&lt;- r0[indices[j]]^2 / sum(abs(r[indices[j],indices]))
+  }
+  H_final[i]&lt;-sum(H)
+}
+
+
+best_idx &lt;- which.max(H_final)
+
+best_vars &lt;- colnames(r)[as.logical(scenarios[best_idx, ])]
+
+print(best_vars)</code></pre>
+<pre><code>## [1] &quot;Fertility&quot; &quot;log_GDP&quot;</code></pre>
+</div>
+<div id="now-lets-see-the-best-dataset-for-our-model." class="section level1">
+<h1>Now let’s see the best dataset for our model.</h1>
+<pre class="r"><code>print(r0)</code></pre>
+<pre><code>##   Fertility     Obesity     Smoking    Internet Electricity  CleanFuels 
+##  -0.8434009   0.2626783   0.2627001   0.8095701   0.7263454   0.7918750 
+##     log_GDP 
+##   0.8725739</code></pre>
+<pre class="r"><code>print(r)</code></pre>
+<pre><code>##              Fertility    Obesity    Smoking   Internet Electricity CleanFuels
+## Fertility    1.0000000 -0.3345933 -0.3690413 -0.8208841  -0.7942491 -0.8173130
+## Obesity     -0.3345933  1.0000000  0.3135864  0.4992039   0.4940238  0.5381867
+## Smoking     -0.3690413  0.3135864  1.0000000  0.3036906   0.3669145  0.2614454
+## Internet    -0.8208841  0.4992039  0.3036906  1.0000000   0.7954018  0.8611223
+## Electricity -0.7942491  0.4940238  0.3669145  0.7954018   1.0000000  0.8019507
+## CleanFuels  -0.8173130  0.5381867  0.2614454  0.8611223   0.8019507  1.0000000
+## log_GDP     -0.8223870  0.3704302  0.2268529  0.8901581   0.7364505  0.8734336
+##                log_GDP
+## Fertility   -0.8223870
+## Obesity      0.3704302
+## Smoking      0.2268529
+## Internet     0.8901581
+## Electricity  0.7364505
+## CleanFuels   0.8734336
+## log_GDP      1.0000000</code></pre>
+<div id="model-estimation-and-comparison" class="section level2">
+<h2>4. Model Estimation and Comparison</h2>
+<p>We decided to compare two approaches: a parsimonious model suggested
+by the Hellwig method and a full research model that includes all
+hypothesized predictors.</p>
+<pre class="r"><code># Model 1: Based on Hellwig&#39;s selection
+model_hellwig &lt;- lm(LifeExp ~ log_GDP + Fertility, data = train_data)
+
+# Model 2: Full research model (including lifestyle and continents)
+# We exclude raw GDP to avoid perfect collinearity with log_GDP
+model_full &lt;- lm(LifeExp ~ log_GDP + Fertility + Obesity + Smoking + 
+                 Internet + Electricity + CleanFuels + Continent, 
+                 data = train_data)
+
+# Reviewing results
+summary(model_hellwig)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = LifeExp ~ log_GDP + Fertility, data = train_data)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -11.7651  -1.9139   0.1422   2.2689   7.1689 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)  45.8036     4.9254   9.300 6.64e-16 ***
+## log_GDP       3.3801     0.4220   8.010 7.42e-13 ***
+## Fertility    -2.2475     0.3992  -5.631 1.16e-07 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 3.186 on 123 degrees of freedom
+## Multiple R-squared:  0.8103, Adjusted R-squared:  0.8072 
+## F-statistic: 262.7 on 2 and 123 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code>summary(model_full)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = LifeExp ~ log_GDP + Fertility + Obesity + Smoking + 
+##     Internet + Electricity + CleanFuels + Continent, data = train_data)
+## 
+## Residuals:
+##      Min       1Q   Median       3Q      Max 
+## -11.5749  -1.8961   0.2731   2.1761   6.5013 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)       50.41180    6.53887   7.710 5.14e-12 ***
+## log_GDP            2.58416    0.69458   3.720 0.000310 ***
+## Fertility         -1.86587    0.53574  -3.483 0.000705 ***
+## Obesity           -0.07148    0.03632  -1.968 0.051498 .  
+## Smoking           -0.05850    0.04236  -1.381 0.170002    
+## Internet           0.01554    0.02841   0.547 0.585400    
+## Electricity        0.01029    0.02479   0.415 0.678832    
+## CleanFuels         0.01441    0.02078   0.694 0.489398    
+## ContinentAmericas  1.21903    1.25126   0.974 0.331998    
+## ContinentAsia      2.48740    1.14410   2.174 0.031764 *  
+## ContinentEurope    3.31894    1.36512   2.431 0.016605 *  
+## ContinentOceania   3.52349    1.59535   2.209 0.029202 *  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 3.119 on 114 degrees of freedom
+## Multiple R-squared:  0.8314, Adjusted R-squared:  0.8152 
+## F-statistic: 51.12 on 11 and 114 DF,  p-value: &lt; 2.2e-16</code></pre>
+<p>The initial estimation of the full model yields a high Adjusted
+R-squared (0.8152), indicating that our variables collectively explain
+about 81.5% of the variance in global life expectancy. As expected,
+log_GDP and Fertility are highly significant (<span class="math inline">\(p &lt; 0.001\)</span>), and the Continent dummy
+variables confirm significant regional differences (e.g., a strong
+positive effect for Europe and Oceania compared to the African
+baseline). However, the infrastructure variables (Internet, Electricity,
+CleanFuels) and lifestyle factors (Smoking, Obesity) lack statistical
+significance. In econometric modeling, such a scenario—where the overall
+model fit is high but individual predictors are insignificant—strongly
+suggests the presence of multicollinearity. To diagnose this, we must
+examine the Variance Inflation Factor (VIF).</p>
+<pre class="r"><code>vif(model_full)</code></pre>
+<pre><code>##                  GVIF Df GVIF^(1/(2*Df))
+## log_GDP      8.730664  1        2.954770
+## Fertility    5.805084  1        2.409374
+## Obesity      3.085865  1        1.756663
+## Smoking      2.143831  1        1.464183
+## Internet     7.225386  1        2.688008
+## Electricity  4.563562  1        2.136250
+## CleanFuels   7.395587  1        2.719483
+## Continent   10.497359  4        1.341637</code></pre>
+<p>The VIF diagnostic test clearly explains the lack of significance in
+our previous model. The VIF values for log_GDP (8.73), CleanFuels
+(7.40), and Internet (7.23) severely exceed the standard acceptable
+threshold of 5, indicating extreme multicollinearity. Access to
+electricity, internet, and clean fuels is so strongly coupled with a
+country’s wealth that including them alongside GDP artificially inflates
+the standard errors of our estimators.</p>
+<p>From a scientific standpoint, this compels us to reject Hypothesis 3
+(H3): at the macroeconomic level, basic infrastructure does not act as
+an independent driver of longevity, but is rather a direct function of
+economic development (log_GDP). Consequently, to establish a robust and
+mathematically sound model, we will remove the redundant infrastructure
+variables (Internet, Electricity, CleanFuels) and estimate a reduced
+model. This will allow us to properly test our remaining hypotheses (H1
+and H2) without the distortion of variance inflation.</p>
+</div>
 </div>
 
 
