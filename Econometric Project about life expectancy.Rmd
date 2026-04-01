@@ -287,7 +287,8 @@ model_final <- lm(LifeExp ~ log_GDP + Fertility + Obesity + Smoking +
 
 summary(model_final)
 ```
-Now let's focus on the model, and see wether there is a need to aplicate some changes or not.
+## 5. Model Diagnostics
+Now let's focus on the model, and see whether there is a need to aplicate some changes or not.
 ```{r}
 bptest(model_final)
 resettest(model_final, power = 2:3, type = "fitted")
@@ -319,6 +320,10 @@ jarque.bera.test(residuals(model_final2))
 resettest(model_final3, power = 2:3, type = "fitted")
 bptest(model_final3)
 jarque.bera.test(residuals(model_final3))
+resettest(model_hellwig, power = 2:3, type = "fitted")
+bptest(model_hellwig)
+jarque.bera.test(residuals(model_hellwig))
+
 ```
 ```{r}
 plot(model_final2, which = 4)
@@ -331,11 +336,38 @@ jarque.bera.test(residuals(model_no_outliers))
 par(mfrow = c(2, 2)) # Dzieli okno graficzne na 4 części
 plot(model_final2)
 ```
+# Justification for Removing Outliers
 
-Teraz przeprowadzimy dla poprawionego modelu analize ex post
+Based on the Cook’s distance plot presented above, several observations were identified as highly influential in the estimation of the regression model.
+
+In particular, observations with indices 20, 106, and 125 exhibit significantly higher Cook’s distance values compared to the rest of the sample. This indicates that these data points have a disproportionately large impact on the estimated coefficients.
+
+A closer inspection reveals that these observations correspond to countries with extreme socio-economic characteristics:
+
+- **Nauru** – exceptionally high obesity and smoking rates,
+- **Nigeria** – very high fertility rate and relatively low life expectancy,
+- **Lesotho** – unusually low life expectancy given its explanatory variables.
+
+Such observations may violate the standard assumptions of the linear regression model and distort the estimation results by exerting excessive influence on parameter values.
+
+From an econometric perspective, it is justified to temporarily remove these outliers in order to:
+
+- reduce the impact of high-leverage observations,
+- improve the distributional properties of residuals,
+- assess the robustness of the model.
+
+After removing these observations, the Jarque-Bera test indicates no significant deviation from normality (p-value = 0.6786), which confirms a substantial improvement in model adequacy.
+
+It should be emphasized that the removal of outliers serves as a robustness check rather than a permanent exclusion of data from the analysis.
+
+
+
+## 6. Prediction and Error Analysis
+In this section, we evaluate the predictive performance of our model using the test dataset. 
+We calculate standard error metrics such as MAE, RMSE, and MAPE.
 
 ```{r}
-predicted<-predict(model_final2, new_data=test_data)
+predicted<-predict(model_final2, newdata=test_data)
 test_residuals<-predicted - test_data$LifeExp
 MAE<-mean(abs(test_residuals))
 RMSE<-sqrt(mean(test_residuals^2))
@@ -345,7 +377,7 @@ MAPE <- mean(abs(test_residuals / test_data$LifeExp)) * 100
 MAPE
 ##############################################################
 model_hellwig
-predicted<-predict(model_hellwig, new_data=test_data)
+predicted<-predict(model_hellwig, newdata=test_data)
 test_residuals<-predicted - test_data$LifeExp
 MAE<-mean(abs(test_residuals))
 RMSE<-sqrt(mean(test_residuals^2))
@@ -355,3 +387,67 @@ MAPE <- mean(abs(test_residuals / test_data$LifeExp)) * 100
 MAPE
 
 ```
+
+## 7. Summary and Interpretation
+
+This study aimed to identify the key determinants of life expectancy across countries using cross-sectional data for 2022. The analysis combined economic, lifestyle, and infrastructure variables to test three main hypotheses regarding the drivers of longevity.
+
+### Model Comparison and Final Choice
+
+Based on both diagnostic tests and predictive performance, we compare the Hellwig model and the extended model (model_final2).
+
+From the diagnostic perspective:
+
+- The Breusch–Pagan test indicates no heteroskedasticity in both models (p-values > 0.05).
+- However, the RESET test suggests misspecification in the Hellwig model (p-value = 0.004), while model_final2 does not show this issue (p-value = 0.29).
+- The Jarque–Bera test indicates non-normality of residuals in both models, although this problem is mitigated after removing outliers.
+
+From the predictive performance perspective:
+
+ model_final2:
+- MAE = 2.86  
+- RMSE = 3.40  
+- MAPE = 4.01%
+
+ Hellwig model:
+- MAE = 2.81  
+- RMSE = 3.38  
+- MAPE = 3.96%
+
+Although the Hellwig model achieves slightly better predictive accuracy, the differences are very small.
+
+### Final Conclusion – Preferred Model
+
+Taking into account both statistical diagnostics and theoretical considerations, model_final2 is selected as the better model.
+
+Despite slightly worse predictive performance, model_final2 does not suffer from functional form misspecification (RESET test), unlike the Hellwig model. This means that it more accurately captures the underlying relationships between variables.
+
+Additionally, model_final2 includes theoretically justified variables (such as lifestyle factors in logarithmic form), which improves its interpretability and consistency with economic theory.
+
+In contrast, the Hellwig model, although simpler and slightly more accurate in prediction, is misspecified and therefore less reliable for inference.
+
+### Overall Interpretation
+
+The results confirm the main hypotheses:
+
+- H1 (economic development): confirmed  
+  GDP per capita (in logarithmic form) has a strong positive impact on life expectancy, with diminishing marginal effects.
+
+- H2 (lifestyle factors): partially confirmed  
+  Obesity and smoking have a negative effect, although their statistical significance is limited.
+
+- H3 (infrastructure): rejected 
+  Infrastructure variables are not significant once GDP is included, suggesting that their impact is largely captured by economic development.
+
+
+
+
+
+
+
+
+
+
+
+
+
