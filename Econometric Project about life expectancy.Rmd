@@ -41,6 +41,8 @@ library(countrycode)
 library(corrplot)
 library(ggplot2)
 library(car)
+library(tseries)
+library(lmtest)
 ```
 
 ## 2. Data Loading and Merging
@@ -240,8 +242,7 @@ print(best_vars)
 # Now let's see the best dataset for our model.
 
 ```{r}
-print(r0)
-print(r)
+print(best_vars)
 ```
 
 
@@ -250,8 +251,8 @@ print(r)
 We decided to compare two approaches: a parsimonious model suggested by the Hellwig method and a full research model that includes all hypothesized predictors.
 
 ```{r model_comparison}
-# Model 1: Based on Hellwig's selection
-model_hellwig <- lm(LifeExp ~ log_GDP + Fertility, data = train_data)
+# Model 1: Based on Hellwig's selection + factors as country 
+model_hellwig <- lm(LifeExp ~ log_GDP + Fertility + Continent, data = train_data)
 
 # Model 2: Full research model (including lifestyle and continents)
 # We exclude raw GDP to avoid perfect collinearity with log_GDP
@@ -277,5 +278,80 @@ The VIF diagnostic test clearly explains the lack of significance in our previou
 
 From a scientific standpoint, this compels us to reject Hypothesis 3 (H3): at the macroeconomic level, basic infrastructure does not act as an independent driver of longevity, but is rather a direct function of economic development (log_GDP). Consequently, to establish a robust and mathematically sound model, we will remove the redundant infrastructure variables (Internet, Electricity, CleanFuels) and estimate a reduced model. This will allow us to properly test our remaining hypotheses (H1 and H2) without the distortion of variance inflation.
 
+```{r}
+model_final <- lm(LifeExp ~ log_GDP + Fertility + Obesity + Smoking + 
+                Continent, 
+                 data = train_data)
+
+# Reviewing results
+
+summary(model_final)
+```
+Now let's focus on the model, and see wether there is a need to aplicate some changes or not.
+```{r}
+bptest(model_final)
+resettest(model_final, power = 2:3, type = "fitted")
+jarque.bera.test(residuals(model_final))
+```
+
+As we can see the p-value in RESET test is significanly belov thereshold 0,05, now we will try to implement different models and see if there is a chance for an improvement
+
+```{r}
+model_final1 <- lm(log(LifeExp) ~ log_GDP + Fertility + Obesity + Smoking + 
+                Continent, 
+                 data = train_data)
 
 
+model_final2 <- lm(LifeExp ~ log_GDP + log(Fertility) + log(Obesity) + log(Smoking) + 
+                Continent, 
+                 data = train_data)
+
+model_final3 <- lm(LifeExp ~ I(log_GDP^2) + Fertility + Obesity + Smoking + 
+                 Continent, 
+                 data = train_data)
+
+resettest(model_final1, power = 2:3, type = "fitted")
+bptest(model_final1)
+jarque.bera.test(residuals(model_final1))
+resettest(model_final2, power = 2:3, type = "fitted")
+bptest(model_final2)
+jarque.bera.test(residuals(model_final2))
+resettest(model_final3, power = 2:3, type = "fitted")
+bptest(model_final3)
+jarque.bera.test(residuals(model_final3))
+```
+```{r}
+plot(model_final2, which = 4)
+train_data[c(20, 106, 125), ]
+model_no_outliers <- lm(LifeExp ~ log_GDP + log(Fertility) + log(Obesity) + log(Smoking) + Continent, 
+                        data = train_data[-c(20, 106, 125), ])
+
+jarque.bera.test(residuals(model_no_outliers))
+
+par(mfrow = c(2, 2)) # Dzieli okno graficzne na 4 części
+plot(model_final2)
+```
+
+Teraz przeprowadzimy dla poprawionego modelu analize ex post
+
+```{r}
+predicted<-predict(model_final2, new_data=test_data)
+test_residuals<-predicted - test_data$LifeExp
+MAE<-mean(abs(test_residuals))
+RMSE<-sqrt(mean(test_residuals^2))
+MAE
+RMSE
+MAPE <- mean(abs(test_residuals / test_data$LifeExp)) * 100
+MAPE
+##############################################################
+model_hellwig
+predicted<-predict(model_hellwig, new_data=test_data)
+test_residuals<-predicted - test_data$LifeExp
+MAE<-mean(abs(test_residuals))
+RMSE<-sqrt(mean(test_residuals^2))
+MAE
+RMSE
+MAPE <- mean(abs(test_residuals / test_data$LifeExp)) * 100
+MAPE
+
+```
