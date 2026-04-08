@@ -2,7 +2,16 @@
 title: "Factors determining average life expectancy."
 author: "Marcel Florjański, Filip Kasprzycki, Bartłomiej Klajn"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 1
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    fig_width: 10
+    fig_height: 5
 ---
 
 ```{r setup, include=FALSE}
@@ -11,6 +20,11 @@ knitr::opts_chunk$set(
   warning = FALSE,
   message = FALSE)
 ```
+
+
+# 1. Introduction
+
+
 In this project, we will analyze various factors in terms of their impact on life expectancy.
 Our dependent variable is:
 -life expectancy, 
@@ -23,18 +37,20 @@ and our explanatory variables are:
 -share of individuals using the internet,
 -share of the population with access to electocity.
 
-In this project we will consider 3 main hypotheses:
+## In this project we will consider 3 main hypotheses:
 
-H1: Economic development (measured by GDP per capita) has a positive and diminishing marginal impact on life expectancy.
+### H1: Economic development (measured by GDP per capita) has a positive and diminishing marginal impact on life expectancy.
 
-H2: Lifestyle risks, specifically smoking and obesity rates, are expected to have a significant negative impact on longevity.
+### H2: Lifestyle risks, specifically smoking and obesity rates, are expected to have a significant negative impact on longevity.
 
-H3: Infrastructure indicators, such as access to electricity and clean fuels, are vital determinants, especially in developing nations.
+### H3: Infrastructure indicators, such as access to electricity and clean fuels, are vital determinants, especially in developing nations.
 
 All the data we use comes from Our World in Data, which is a reputable source for global statistics and research. The data is collected from various sources, including international organizations, research institutions, and government agencies. It is regularly updated and covers a wide range of topics, making it a valuable resource for our analysis of life expectancy and its determinants.
 
-Libraries we are going to use:
-```{r}
+### Libraries we are going to use:
+
+
+```{r libraries}
 library(tidyverse)
 library(mice)
 library(countrycode)
@@ -45,7 +61,7 @@ library(tseries)
 library(lmtest)
 ```
 
-## 2. Data Loading and Merging
+# 2. Data Loading and Merging
 In this section, we load the raw datasets and merge them based on country entity and code for the year 2022.
 
 ```{r data_merge_final}
@@ -91,24 +107,30 @@ md.pattern(df_final, plot = FALSE)
 In this section, we will explore the descriptive statistics of our dataset.
 
 At first, we will look at the summary statistics of our variables to understand their central tendencies and dispersions.
-```{r}
+```{r descriptive_stats}
 summary(df_final %>% select(-Entity, -Code))
 ```
 
 
 Next, we will visualize the structure of our variables.
+
+
 ```{r}
 hist(df_final$LifeExp, main="Distribution of Life Expectancy", col="lightblue", border="white", xlab="Years")
 ```
 
 
 The distribution of life expectancy is slightly skewed to the left, but is strongly concentrated around the ages of 70-80. No outliers.
+
+
 ```{r}
 hist(df_final$GDP, main="Distribution of Raw GDP per Capita", col="orange", border="white", xlab="USD")
 ```
 
 
 The distribution is very skewed to the right. Most countries have rather low scores (below 20,000 USD), but there are a few that reach over 100,000 USD. For correct modeling, it is advisable to take the logarithm.
+
+
 ```{r}
 par(mfrow=c(1,2))
 hist(df_final$Obesity, main="Obesity Rates", col="tomato", border="white")
@@ -118,6 +140,8 @@ par(mfrow=c(1,1))
 
 
 Obesity has a distribution close to normal. Tobacco has a fairly even distribution with a slight right-skew.
+
+
 ```{r}
 par(mfrow=c(1,3))
 hist(df_final$Internet, main="Internet Access", col="lightgreen", border="white")
@@ -132,6 +156,7 @@ Infrastructure variables are highly specific, with a large number of countries s
 
 
 Based on the previous histogram analysis, we apply a natural logarithm to GDP per capita. This transformation is intended to linearize the relationship between income and life expectancy, as suggested by Hypothesis 1.
+
 
 ```{r log_gdp_transform}
 df_final$log_GDP <- log(df_final$GDP)
@@ -185,7 +210,7 @@ ggplot(df_final, aes(x = log_GDP, y = LifeExp, color = Continent)) +
 
 Clear differences between continents are visible. Europe clearly dominates with the highest and highly concentrated results. Africa fares by far the worst. Africa and Asia have very large whiskers, indicating their strong internal differentiation. Analysis of the graphs indicates that the "Continent" variable must be included in the model as a quantitative variable. Without it, the model would distort the results because it would not know that belonging to Europe statistically increases longevity.
 
-#Model preparation- Train/Test split
+## Model preparation- Train/Test split
 
 
 After the initial analysis of variables, we divide the data into two sets - we will train our model on one set, and then test its effectiveness on the "new" one. We divide the data in an 80/20 ratio.
@@ -236,17 +261,16 @@ best_idx <- which.max(H_final)
 
 best_vars <- colnames(r)[as.logical(scenarios[best_idx, ])]
 
-print(best_vars)
 
 ```
-# Now let's see the best dataset for our model.
+## Now let's see the best dataset for our model.
 
 ```{r}
 print(best_vars)
 ```
 
 
-## 4. Model Estimation and Comparison
+# 4. Model Estimation and Comparison
 
 We decided to compare two approaches: a parsimonious model suggested by the Hellwig method and a full research model that includes all hypothesized predictors.
 
@@ -287,15 +311,21 @@ model_final <- lm(LifeExp ~ log_GDP + Fertility + Obesity + Smoking +
 
 summary(model_final)
 ```
-## 5. Model Diagnostics
-Now let's focus on the model, and see whether there is a need to aplicate some changes or not.
+
+
+# 5. Model Diagnostics
+Now let's focus on the model, and see whether there is a need to apply some changes or not.
+
+
 ```{r}
 bptest(model_final)
 resettest(model_final, power = 2:3, type = "fitted")
 jarque.bera.test(residuals(model_final))
 ```
 
+
 As we can see the p-value in RESET test is significanly belov thereshold 0,05, now we will try to implement different models and see if there is a chance for an improvement
+
 
 ```{r}
 model_final1 <- lm(log(LifeExp) ~ log_GDP + Fertility + Obesity + Smoking + 
@@ -325,6 +355,7 @@ bptest(model_hellwig)
 jarque.bera.test(residuals(model_hellwig))
 
 ```
+
 ```{r}
 plot(model_final2, which = 4)
 train_data[c(20, 106, 125), ]
@@ -335,8 +366,12 @@ jarque.bera.test(residuals(model_no_outliers))
 
 par(mfrow = c(2, 2)) # Dzieli okno graficzne na 4 części
 plot(model_final2)
+summary(model_final2)
 ```
-# Justification for Removing Outliers
+
+
+## Justification for Removing Outliers
+
 
 Based on the Cook’s distance plot presented above, several observations were identified as highly influential in the estimation of the regression model.
 
@@ -362,9 +397,12 @@ It should be emphasized that the removal of outliers serves as a robustness chec
 
 
 
-## 6. Prediction and Error Analysis
+# 6. Prediction and Error Analysis
+
+
 In this section, we evaluate the predictive performance of our model using the test dataset. 
 We calculate standard error metrics such as MAE, RMSE, and MAPE.
+
 
 ```{r}
 predicted<-predict(model_final2, newdata=test_data)
@@ -388,11 +426,12 @@ MAPE
 
 ```
 
-## 7. Summary and Interpretation
+
+# 7. Summary and Interpretation
 
 This study aimed to identify the key determinants of life expectancy across countries using cross-sectional data for 2022. The analysis combined economic, lifestyle, and infrastructure variables to test three main hypotheses regarding the drivers of longevity.
 
-### Model Comparison and Final Choice
+## Model Comparison and Final Choice
 
 Based on both diagnostic tests and predictive performance, we compare the Hellwig model and the extended model (model_final2).
 
@@ -416,7 +455,7 @@ From the predictive performance perspective:
 
 Although the Hellwig model achieves slightly better predictive accuracy, the differences are very small.
 
-### Final Conclusion – Preferred Model
+## Final Conclusion – Preferred Model
 
 Taking into account both statistical diagnostics and theoretical considerations, model_final2 is selected as the better model.
 
@@ -426,7 +465,35 @@ Additionally, model_final2 includes theoretically justified variables (such as l
 
 In contrast, the Hellwig model, although simpler and slightly more accurate in prediction, is misspecified and therefore less reliable for inference.
 
-### Overall Interpretation
+
+## Parameter Interpretation (model_final2)
+
+Since our model takes a level-log form (where the dependent variable is in absolute years and continuous independent variables are in natural logarithms), a 1% increase in the explanatory variable changes life expectancy by approximately $\beta / 100$ years..
+
+### log_GDP: 
+
+
+The estimated coefficient is 3.25. This means that, ceteris paribus, a 10% increase in GDP per capita is associated with an increase in average life expectancy by approximately 0.325 years (roughly 4 months). This strongly confirms our first hypothesis regarding the diminishing marginal utility of economic growth.
+
+
+### log(Fertility): 
+
+
+The estimated coefficient is -5.39. Assuming other conditions remain constant, a 10% increase in the fertility rate is associated with a decrease in life expectancy by approximately 0.539 years (roughly 6.5 months).
+
+
+### Continent (Dummy Variables): 
+
+
+The categorical variables show regional fixed effects relative to the baseline continent (Africa). For instance, the coefficient for ContinentEurope is 2.44. This signifies that, ceteris paribus, a country located in Europe has an average life expectancy that is 2.44 years longer than a country in Africa with the exact same GDP, fertility, and lifestyle factors. Similarly, being in Asia adds 2.29 years compared to the African baseline.
+
+
+### Lifestyle Factors (Obesity and Smoking):
+
+Although the coefficients for log(Obesity) (-0.81) and log(Smoking) (-0.09) are negative—which aligns with the theoretical assumptions of H2—their high p-values (0.139 and 0.892, respectively) indicate that they are not statistically significant in this model.
+
+
+## Overall Interpretation
 
 The results confirm the main hypotheses:
 
