@@ -444,11 +444,13 @@ From the diagnostic perspective:
 From the predictive performance perspective:
 
  model_final2:
+ 
 - MAE = 2.86  
 - RMSE = 3.40  
 - MAPE = 4.01%
 
  Hellwig model:
+ 
 - MAE = 2.81  
 - RMSE = 3.38  
 - MAPE = 3.96%
@@ -468,8 +470,6 @@ In contrast, the Hellwig model, although simpler and slightly more accurate in p
 
 ## Parameter Interpretation (model_final2)
 
-Since our model takes a level-log form (where the dependent variable is in absolute years and continuous independent variables are in natural logarithms), a 1% increase in the explanatory variable changes life expectancy by approximately $\beta / 100$ years..
-
 ### log_GDP: 
 
 
@@ -485,7 +485,7 @@ The estimated coefficient is -5.39. Assuming other conditions remain constant, a
 ### Continent (Dummy Variables): 
 
 
-The categorical variables show regional fixed effects relative to the baseline continent (Africa). For instance, the coefficient for ContinentEurope is 2.44. This signifies that, ceteris paribus, a country located in Europe has an average life expectancy that is 2.44 years longer than a country in Africa with the exact same GDP, fertility, and lifestyle factors. Similarly, being in Asia adds 2.29 years compared to the African baseline.
+The categorical variables show regional fixed effects relative to the baseline continent (Africa). For instance, the coefficient for Europe is 2.44. This signifies that, ceteris paribus, a country located in Europe has an average life expectancy that is 2.44 years longer than a country in Africa with the exact same GDP, fertility, and lifestyle factors. Similarly, being in Asia adds 2.29 years compared to the African baseline.
 
 
 ### Lifestyle Factors (Obesity and Smoking):
