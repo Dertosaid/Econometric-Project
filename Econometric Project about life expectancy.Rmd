@@ -500,8 +500,10 @@ The results confirm the main hypotheses:
 - H1 (economic development): confirmed  
   GDP per capita (in logarithmic form) has a strong positive impact on life expectancy, with diminishing marginal effects.
 
-- H2 (lifestyle factors): partially confirmed  
-  Obesity and smoking have a negative effect, although their statistical significance is limited.
+- H2 (lifestyle factors): NOT CONFIRMED  
+  Although obesity and smoking show negative coefficients as expected, 
+  they are statistically insignificant (p > 0.05), so we cannot confirm 
+  their impact on life expectancy.
 
 - H3 (infrastructure): rejected 
   Infrastructure variables are not significant once GDP is included, suggesting that their impact is largely captured by economic development.
